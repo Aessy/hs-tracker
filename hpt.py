@@ -83,6 +83,9 @@ class LogWatcher(QThread):
                     elif card == "Excavated Evil" and "zone from  -> OPPOSING GRAVEYARD" in line:
                         print("FRIENDLY DECK")
                         self.process_line(card, "deck")
+                elif "GameAccountId=" in line:
+                    print("Processing line.")
+                    self.process_line({}, "reset")
 
 class CreateDeckWidget(QWidget):
     def __init__(self, hs_api, parent=None):
@@ -256,10 +259,6 @@ class CardWidget(QWidget):
 
         self.color = QColor(Qt.green)
 
-        # self.create_overlay()
-
-
-
         name_lbl = QLabel(self)
         name_lbl.setPixmap(self.card_name_pic)
         name_lbl.setStyleSheet("QLabel { background-color: #000000 }")
@@ -293,18 +292,6 @@ class CardWidget(QWidget):
 
         self.setLayout(hbox)
         self.show()
-
-    def create_overlay(self):
-        font = QFont("Times", 15, QFont.Bold)
-
-        painter = QPainter()
-        painter.begin(self.card_name_pic)
-        painter.setPen(QPen(QColor(Qt.red),4,Qt.SolidLine))
-        painter.setBrush(self.color)
-        painter.setFont(font)
-        painter.drawText(0, 0, self.card_name_pic.width(), 50, Qt.AlignCenter, str(self.card["card"]["name"]))
-        painter.end()
-
     
     def cost(self):
         return self.card["card"]["cost"]
@@ -324,12 +311,14 @@ class CardWidget(QWidget):
         font.setFamily('Lucida')
         font.setPointSize(20)
 
-        rect = QRect(0,0,43,43)
+        rect = QRect(0,0,100,43)
         pixmap = QPixmap(rect.width(), rect.height())
 
         count = int(self.card["current_count"])
         if count == 0:
             pixmap.fill(QColor(Qt.red))
+        elif count != int(self.card["count"]):
+            pixmap.fill(QColor(102,102,0))
         else:
             pixmap.fill(QColor(0,0,51))
 
@@ -350,6 +339,8 @@ class Deck(QWidget):
         
         # List of CardWidgets. Sorted on mana cost
         self.deck = []
+
+        self.original_deck = []
 
         self.vbox = QVBoxLayout(self)
         self.vbox.setContentsMargins(0,0,0,0)
@@ -385,6 +376,12 @@ class Deck(QWidget):
         card["current_count"] = card["count"]
         self.deck.append(CardWidget(card))
 
+    def add_original_card(self, card):
+        print("Adding original card to deck:" + card["card"]["name"])
+        card["current_count"] = card["count"]
+        self.deck.append(CardWidget(card))
+        self.original_deck.append(card)
+
     def update_deck(self):
         d = sorted(self.deck, key=lambda card: card.cost())
         self.deck = d
@@ -400,11 +397,25 @@ class Deck(QWidget):
         while self.vbox.count():
             self.vbox.takeAt(0)
 
+    ''' .'''
     def clear_deck(self):
         self.clear_layout()
         for card in self.deck:
             card.close()
         self.deck.clear()
+
+    ''' Clear all data from deck, all original cards are removed.'''
+    def clear_all(self):
+        self.clear_deck()
+        self.original_deck.clear()
+
+    ''' Remove all cards that are not part of original deck.'''
+    def reset(self):
+        print("RESET")
+        self.clear_deck()
+        for card in self.original_deck:
+            self.add_new_card(card)
+        self.update_deck()
 
 
 class Application(QWidget):
@@ -413,10 +424,13 @@ class Application(QWidget):
 
         self.hs_api = HearthstoneApi("https://omgvamp-hearthstone-v1.p.mashape.com/cards", "xheCZlY9rKmshpNX8bKzZZu9OXLop16ppZpjsnLLmgFYvLVsA5")
 
+        self.deck = Deck()
+
         self.load_deck_button = QPushButton("Import")
         self.load_deck_button.clicked.connect(self.load_deck)
 
         self.reset = QPushButton("Reset")
+        self.reset.clicked.connect(self.deck.reset)
         self.create_deck = QPushButton("Create")
         self.create_deck.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.gy = QPushButton("GY")
@@ -431,14 +445,13 @@ class Application(QWidget):
         self.menu_layout.addWidget(self.gy)
         self.menu_layout.addWidget(self.load_deck_button)
         self.menu_layout.addWidget(self.create_deck)
+        self.menu_layout.addWidget(self.reset)
 
         self.deck_model = QStandardItemModel(0,3)
         self.deck_model.setHorizontalHeaderLabels(['Cost', 'Name', 'Count'])
 
         self.play_deck_list = QListView()
         self.play_deck_list.setModel(self.deck_model)
-
-        self.deck = Deck()
 
 
         self.play_deck_layout = QVBoxLayout()
@@ -507,58 +520,23 @@ class Application(QWidget):
     def update(self, card_name, card_action):
         print("update")
 
-        card = self.hs_api.find_cards(card_name)[0]
-        if card_action == "deck":
-            self.deck.add_card(card)
-        elif card_action == "gy":
-            self.graveyard.add_card(card)
-        else:
-            self.deck.remove_card(card)
+        try:
+            if card_action == "deck":
+                card = self.hs_api.find_cards(card_name)[0]
+                self.deck.add_card(card)
+            elif card_action == "gy":
+                card = self.hs_api.find_cards(card_name)[0]
+                self.graveyard.add_card(card)
+            elif card_action == "hand":
+                card = self.hs_api.find_cards(card_name)[0]
+                self.deck.remove_card(card)
+            elif card_action == "reset":
+                self.deck.reset()
+                self.graveyard.clear_all()
+        except Exception as e:
+            pass
+
         return
-
-        found = False
-
-        addition = -1
-
-        if card_action == "deck":
-            addition = 1
-
-        for index in range(0, self.deck_model.rowCount()):
-            model_index = self.deck_model.index(index, 0)
-            item = self.deck_model.itemFromIndex(model_index)
-
-            print(item.text())
-
-            card = item.data()
-
-
-            print(card_name.lower())
-            print(card['card']['name'].lower())
-            if card_name.lower() == card['card']['name'].lower():
-                print(card["current_count"])
-                count = str(int(card['current_count']) + addition)
-                card['current_count'] = count
-                item.setText(self.create_card_string(card["card"], card["current_count"]))
-                item.setData(card)
-                if card["current_count"] == "1":
-                    item.setBackground(QColor("yellow"))
-                elif card["current_count"] == "0":
-                    item.setBackground(QColor("red"))
-                addition = 0
-                break
-
-        if addition == 1:
-            print("ADDING NEW CARD")
-            cards = self.hs_api.find_cards(card_name)
-            card = cards[0]
-
-            self.add_card({"card":card, "count":1,"current_count":1})
-        self.repaint()
-
-    def add_card(self, card):
-        card["current_count"] = card["count"]
-        self.play_deck_layout.add_new_card(CardWidget(card))
-
 
     def load(self, filename):
         try:
@@ -575,11 +553,11 @@ class Application(QWidget):
                 print(card["card"])
         sorted_deck  = sorted(l, key=lambda card: card["card"]["cost"])
 
-        self.deck.clear_deck()
-        self.graveyard.clear_deck()
+        self.deck.clear_all()
+        self.graveyard.clear_all()
         for index in range(0, len(sorted_deck)):
             card = sorted_deck[index]
-            self.deck.add_new_card(card)
+            self.deck.add_original_card(card)
         self.deck.update_deck()
         
 
