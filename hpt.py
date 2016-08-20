@@ -264,13 +264,11 @@ class CardWidget(QWidget):
         name_lbl.setStyleSheet("QLabel { background-color: #000000 }")
         name_lbl.setSizePolicy(QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed))
         name_lbl.setContentsMargins(2,2,2,2)
-        #name_lbl.setMinimumWidth(50)
 
         mana_lbl = QLabel(self)
         mana_lbl.setPixmap(self.mana_pic)
         mana_lbl.setStyleSheet("QLabel { background-color: #000000 }")
         mana_lbl.setContentsMargins(2,2,2,2)
-        #mana_lbl.setMinimumWidth(50)
         mana_lbl.setSizePolicy(QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed))
 
         self.count_lbl = QLabel(self)
@@ -316,11 +314,11 @@ class CardWidget(QWidget):
 
         count = int(self.card["current_count"])
         if count == 0:
-            pixmap.fill(QColor(Qt.red))
+            pixmap.fill(QColor(210, 27,57))
         elif count != int(self.card["count"]):
-            pixmap.fill(QColor(102,102,0))
+            pixmap.fill(QColor(122, 122, 29))
         else:
-            pixmap.fill(QColor(0,0,51))
+            pixmap.fill(QColor(36,36,41))
 
         painter = QPainter()
         painter.begin(pixmap)
@@ -404,18 +402,26 @@ class Deck(QWidget):
             card.close()
         self.deck.clear()
 
-    ''' Clear all data from deck, all original cards are removed.'''
     def clear_all(self):
+        ''' Clear all data from deck, all original cards are removed.'''
         self.clear_deck()
         self.original_deck.clear()
 
-    ''' Remove all cards that are not part of original deck.'''
     def reset(self):
+        ''' Remove all cards that are not part of original deck.'''
         print("RESET")
         self.clear_deck()
         for card in self.original_deck:
             self.add_new_card(card)
         self.update_deck()
+
+def set_button_color(button):
+    pal = button.palette()
+    pal.setColor(QPalette.Button, QColor(36,36,41))
+    button.setAutoFillBackground(True)
+    button.setPalette(pal)
+    button.update()
+
 
 
 class Application(QWidget):
@@ -426,34 +432,35 @@ class Application(QWidget):
 
         self.deck = Deck()
 
+
         self.load_deck_button = QPushButton("Import")
         self.load_deck_button.clicked.connect(self.load_deck)
+        set_button_color(self.load_deck_button)
 
         self.reset = QPushButton("Reset")
         self.reset.clicked.connect(self.deck.reset)
+        set_button_color(self.reset)
+
         self.create_deck = QPushButton("Create")
         self.create_deck.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.gy = QPushButton("GY")
-
         self.create_deck.clicked.connect(self.create)
-        self.gy.clicked.connect(self.toggle_gy)
+        set_button_color(self.create_deck)
 
+        self.gy = QPushButton("GY")
+        self.gy.clicked.connect(self.toggle_gy)
+        set_button_color(self.gy)
+
+
+        # Menu layout
         self.menu_layout = QHBoxLayout()
         self.menu_layout.setContentsMargins(0,0,0,0)
         self.menu_layout.setSpacing(0)
-        # self.menu_layout.setSizeConstraint(QLayout.SetFixedSize)
         self.menu_layout.addWidget(self.gy)
         self.menu_layout.addWidget(self.load_deck_button)
         self.menu_layout.addWidget(self.create_deck)
         self.menu_layout.addWidget(self.reset)
 
-        self.deck_model = QStandardItemModel(0,3)
-        self.deck_model.setHorizontalHeaderLabels(['Cost', 'Name', 'Count'])
-
-        self.play_deck_list = QListView()
-        self.play_deck_list.setModel(self.deck_model)
-
-
+        # Current deck layout
         self.play_deck_layout = QVBoxLayout()
         self.play_deck_layout.setContentsMargins(0,0,0,0)
         self.play_deck_layout.setSpacing(0)
@@ -461,18 +468,17 @@ class Application(QWidget):
         self.play_deck_layout.addLayout(self.menu_layout)
         self.play_deck_layout.addWidget(self.deck)
 
-
+        # Create deck widget.
         self.create_deck_widget = CreateDeckWidget(self.hs_api)
         self.create_deck_widget.setHidden(True)
 
+        # Graveyard
         self.graveyard = Deck()
         self.graveyard.add_card(self.hs_api.find_cards("forbidden")[0])
         self.graveyard.setHidden(True)
 
         self.create_deck_layout = QHBoxLayout()
         self.create_deck_layout.addWidget(self.create_deck_widget)
-
-        # self.a_test_card = CardWidget(self.hs_api.find_cards("forbidden shap")[0])
 
         main_layout = QGridLayout()
         main_layout.setContentsMargins(0,0,0,0)
@@ -481,14 +487,13 @@ class Application(QWidget):
         main_layout.addLayout(self.play_deck_layout, 0,0)
         main_layout.addLayout(self.create_deck_layout, 0,1)
         main_layout.addWidget(self.graveyard,0,2)
-        #main_layout.addWidget(self.a_test_card, 1, 0)
 
         self.setSizePolicy(QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed))
         self.setContentsMargins(0,0,0,0)
 
         self.setLayout(main_layout)
 
-        self.log_watcher= LogWatcher("/home/jens/.PlayOnLinux/wineprefix/WorldOfWarcraft/drive_c/Program Files/Hearthstone/Hearthstone_Data/output_log.txt")
+        self.log_watcher= LogWatcher("/home/jens/.wine_bnet/drive_c/Program Files (x86)/Hearthstone/Hearthstone_Data/output_log.txt")
         self.log_watcher.card_action.connect(self.update)
         self.log_watcher.start()
 
@@ -513,11 +518,9 @@ class Application(QWidget):
         dialog.fileSelected.connect(self.load)
         dialog.open()
 
-    def create_card_string(self, card, count):
-        s = str(card['cost']) + " - " + card['name'] + " - " + str(count)
-        return s
-
     def update(self, card_name, card_action):
+        ''' Update from config.'''
+
         print("update")
 
         try:
