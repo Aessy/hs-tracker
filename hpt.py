@@ -237,6 +237,21 @@ class CreateDeckWidget(QWidget):
             new_count = int(self.deck_count.text()) + int(card['count'])
             self.deck_count.setText(str(new_count))
 
+def draw_text_on_pixmap(pixmap, text, x, y, size, weight):
+    font = QFont("PassionOne", size, weight, True)
+    font.setBold(True)
+    painter = QPainter()
+    path = QPainterPath()
+    pen = QPen()
+    pen.setWidth(4)
+
+    painter.begin(pixmap)
+    painter.setFont(font)
+    painter.setRenderHint(QPainter.Antialiasing)
+    path.addText(x, y, font,text)
+    painter.fillPath(path, QColor(Qt.white))
+    painter.strokePath(path, QColor(Qt.black))
+    painter.end()
 
 class CardWidget(QWidget):
     def __init__(self, card, parent=None):
@@ -252,10 +267,12 @@ class CardWidget(QWidget):
         self.card_pic = QPixmap(image)
 
         mana_rect = QRect(10,39,43,43)
-        self.mana_pic = self.card_pic.copy(mana_rect)
+        self.mana_pic = self.card_pic.copy(mana_rect).scaled(35, 35, Qt.IgnoreAspectRatio, Qt.FastTransformation)
 
-        name_rect = QRect(16,80,164,43)
-        self.card_name_pic = self.card_pic.copy(name_rect)
+        name_rect = QRect(16,84,164,43)
+        self.card_name_pic = self.card_pic.copy(name_rect).scaled(164, 35, Qt.IgnoreAspectRatio, Qt.FastTransformation)
+
+        draw_text_on_pixmap(self.card_name_pic, self.card["card"]["name"], 10,25,14,8)
 
         self.color = QColor(Qt.green)
 
@@ -305,11 +322,10 @@ class CardWidget(QWidget):
             self.count_lbl.setPixmap(new_count)
 
     def create_count(self):
-        font = QFont()
-        font.setFamily('Lucida')
-        font.setPointSize(20)
+        #font.setFamily('Lucida')
+        #font.setPointSize(20)
 
-        rect = QRect(0,0,100,43)
+        rect = QRect(0,0,50,35)
         pixmap = QPixmap(rect.width(), rect.height())
 
         count = int(self.card["current_count"])
@@ -320,13 +336,7 @@ class CardWidget(QWidget):
         else:
             pixmap.fill(QColor(36,36,41))
 
-        painter = QPainter()
-        painter.begin(pixmap)
-        painter.setPen(QPen(QColor(Qt.white),1,Qt.SolidLine))
-        painter.setBrush(self.color)
-        painter.setFont(font)
-        painter.drawText(0, 0, 43, 43, Qt.AlignCenter, str(self.card["current_count"]))
-        painter.end()
+        draw_text_on_pixmap(pixmap, self.card["current_count"],16,27,25,40)
 
         return pixmap
 
@@ -458,7 +468,7 @@ class Application(QWidget):
         self.menu_layout.addWidget(self.gy)
         self.menu_layout.addWidget(self.load_deck_button)
         self.menu_layout.addWidget(self.create_deck)
-        self.menu_layout.addWidget(self.reset)
+        # self.menu_layout.addWidget(self.reset)
 
         # Current deck layout
         self.play_deck_layout = QVBoxLayout()
